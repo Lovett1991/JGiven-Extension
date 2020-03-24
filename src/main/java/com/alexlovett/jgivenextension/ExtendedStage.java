@@ -45,5 +45,9 @@ public class ExtendedStage<SELF extends ExtendedStage<?>> extends Stage<SELF> {
             return self();
         }
 
+        public SELF backup() {
+            return reverse;
+        }
+
     }
 }

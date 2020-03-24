@@ -1,6 +1,7 @@
 package com.tngtech.jgiven.impl;
 
 import com.alexlovett.jgivenextension.ExtendedScenarioTest;
+import com.alexlovett.jgivenextension.ExtendedStage;
 import com.alexlovett.jgivenextension.UniqueStepScenarioCaseModel;
 import com.tngtech.jgiven.report.model.InvocationMode;
 import com.tngtech.jgiven.report.model.NamedArgument;
@@ -265,6 +266,7 @@ public class ExtendedScenarioModeBuilder extends ScenarioModelBuilder implements
     }
 
     @Override
+    @SneakyThrows
     StepModel createStepModel(Method paramMethod, List<NamedArgument> arguments, InvocationMode mode ) {
         StepModel model = super.createStepModel(paramMethod, arguments, mode);
         StepNode node = StepNode.builder().model(model).method(paramMethod).build();
@@ -275,10 +277,10 @@ public class ExtendedScenarioModeBuilder extends ScenarioModelBuilder implements
             previous = previous.getParent().orElseThrow(() -> new IllegalStateException("Root node cannot be infertile"));
         }
 
-//        if(model.getWords().stream().anyMatch(Word::isIntroWord) && !isNewStage) {
-//            previous.neuter();
-//            previous = rootNode.getLastFertile();
-//        }
+        if (paramMethod.equals(ExtendedStage.NestedStage.class.getDeclaredMethod("backup"))) {
+            previous.neuter();
+            return null;
+        }
 
         previous.addChild(node);
         return model;
