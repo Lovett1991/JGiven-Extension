@@ -259,10 +259,22 @@ public class ExtendedScenarioModeBuilder extends ScenarioModelBuilder implements
                 .flatMap(Arrays::stream)
                 .collect(Collectors.toList());
 
-        return potentialChild.getMethod()
+        // Detecting methods contained in ExtendedStage class and above
+        // In case a connecting word is used, the child class != parentMethod.returnType
+        if (potentialChild.getMethod()
                 .filter(parentMethods::contains)
-                .isPresent();
+                .isPresent()) {
+            return true;
+        }
 
+        Class childClass = potentialChild.getMethod()
+                .orElseThrow(() -> new IllegalStateException("Potential child is missing method"))
+                .getDeclaringClass();
+        if (childClass.equals(parentReturnType)) {
+            return true;
+        }
+
+        return false;
     }
 
     @Override
