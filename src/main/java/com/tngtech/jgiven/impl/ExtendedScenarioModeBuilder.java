@@ -3,6 +3,8 @@ package com.tngtech.jgiven.impl;
 import com.alexlovett.jgivenextension.ExtendedScenarioTest;
 import com.alexlovett.jgivenextension.ExtendedStage;
 import com.alexlovett.jgivenextension.UniqueStepScenarioCaseModel;
+import com.tngtech.jgiven.annotation.AfterStage;
+import com.tngtech.jgiven.impl.util.ReflectionUtil;
 import com.tngtech.jgiven.report.model.InvocationMode;
 import com.tngtech.jgiven.report.model.NamedArgument;
 import com.tngtech.jgiven.report.model.ScenarioModel;
@@ -13,7 +15,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.SneakyThrows;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,6 +36,7 @@ import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Optional.ofNullable;
 import static java.util.Spliterator.ORDERED;
 import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.stream.StreamSupport.stream;
@@ -41,6 +46,11 @@ public class ExtendedScenarioModeBuilder extends ScenarioModelBuilder implements
     private StepNode rootNode = StepNode.builder().build();
     private boolean isNewStage = false;
     private UniqueStepScenarioCaseModel scenarioCaseModel;
+    private Word introWord;
+
+    private Optional<Word> introWord() {
+        return ofNullable(introWord);
+    }
 
     @Override
     @SneakyThrows
@@ -60,8 +70,24 @@ public class ExtendedScenarioModeBuilder extends ScenarioModelBuilder implements
 
     }
 
+    private Object currentStage;
+
     @Override
-    public void stageChanged() {
+    public void stageChanged(Object stage) {
+        if (currentStage != null) {
+            currentStage.getClass().getDeclaringClass();
+            Stream.of(currentStage.getClass().getSuperclass().getDeclaredMethods())
+                    .filter(method -> method.isAnnotationPresent(AfterStage.class))
+                    .forEach(method -> {
+                        try {
+                            method.invoke(currentStage);
+                        } catch (InvocationTargetException | IllegalAccessException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+
+        }
+        currentStage = stage;
         rootNode.neuterChildren();
         rootNode.addChild(StepNode.builder().build());
         isNewStage = true;
@@ -116,19 +142,19 @@ public class ExtendedScenarioModeBuilder extends ScenarioModelBuilder implements
         }
 
         public Optional<StepModel> getModel() {
-            return Optional.ofNullable(model);
+            return ofNullable(model);
         }
 
         public Optional<Method> getMethod() {
-            return Optional.ofNullable(method);
+            return ofNullable(method);
         }
 
         public Optional<StepNode> getParent() {
-            return Optional.ofNullable(parent);
+            return ofNullable(parent);
         }
 
         public StepNode getRoot() {
-            return Optional.ofNullable(parent)
+            return ofNullable(parent)
                     .orElse(this);
         }
 
@@ -277,10 +303,26 @@ public class ExtendedScenarioModeBuilder extends ScenarioModelBuilder implements
         return false;
     }
 
+    private boolean ignore(Method paramMethod) {
+        return paramMethod.isAnnotationPresent(AfterStage.class);
+    }
+
     @Override
     @SneakyThrows
     StepModel createStepModel(Method paramMethod, List<NamedArgument> arguments, InvocationMode mode ) {
         StepModel model = super.createStepModel(paramMethod, arguments, mode);
+
+        if (ignore(paramMethod)){
+            return model;
+        }
+
+        introWord().ifPresent(word -> {
+            if (!model.getWords().stream().anyMatch(Word::isIntroWord)) {
+                model.addIntroWord(word);
+            }
+            introWord = null;
+        });
+
         StepNode node = StepNode.builder().model(model).method(paramMethod).build();
 
         StepNode previous = rootNode.getLastFertile();
@@ -296,6 +338,14 @@ public class ExtendedScenarioModeBuilder extends ScenarioModelBuilder implements
 
         previous.addChild(node);
         return model;
+    }
+
+    @Override
+    public void introWordAdded(String word) {
+        super.introWordAdded(word);
+        introWord = new Word();
+        introWord.setIntroWord( true );
+        introWord.setValue( word );
     }
 
     @Override

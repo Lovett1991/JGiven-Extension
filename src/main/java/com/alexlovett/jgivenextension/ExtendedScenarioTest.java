@@ -24,11 +24,11 @@ public abstract class ExtendedScenarioTest<GIVEN, WHEN, THEN> extends ScenarioTe
     }
 
     public interface StageChangeListener {
-        void stageChanged();
+        void stageChanged(Object stage);
     }
 
     private <T> T wrapStage(T stage){
-        stageChangeListener.stageChanged();
+        stageChangeListener.stageChanged(stage);
         if (stage instanceof ExtendedStage) {
             ((ExtendedStage) stage).withScenarioBase(getScenario());
         }
